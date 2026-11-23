@@ -1,6 +1,6 @@
-// Offline support: serve the app from cache, refresh the cache in the background.
-const CACHE = 'bp-diary-v1';
-const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+// Offline support: network first (updates arrive at once), cached copy when offline.
+const CACHE = 'bp-diary-v2';
+const FILES = ['./', './index.html', './i18n.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
@@ -12,12 +12,9 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
-  e.respondWith(caches.open(CACHE).then(async cache => {
-    const cached = await cache.match(e.request, { ignoreSearch: true });
-    const fresh = fetch(e.request).then(res => {
+  e.respondWith(caches.open(CACHE).then(cache =>
+    fetch(e.request).then(res => {
       if (res.ok) cache.put(e.request, res.clone());
       return res;
-    }).catch(() => cached);
-    return cached || fresh;
-  }));
+    }).catch(() => cache.match(e.request, { ignoreSearch: true }))));
 });
