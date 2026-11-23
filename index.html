@@ -185,7 +185,7 @@ label.inline { flex-direction: row; align-items: center; gap: 6px; }
       <input type="file" id="impFile" accept=".json,application/json" hidden>
       <button id="clearAll" class="danger" data-i18n="clear"></button>
     </div>
-    <p class="hint" data-i18n="hint1"></p>
+    <p class="hint" id="hint1" data-i18n="hint1"></p>
     <p class="hint" data-i18n="hint2"></p>
   </section>
 </main>
@@ -197,6 +197,7 @@ label.inline { flex-direction: row; align-items: center; gap: 6px; }
 const KEY = 'bp-diary-v1', NAME_KEY = 'bp-diary-patient', PERIOD_KEY = 'bp-diary-period';
 const UI_LANG_KEY = 'bp-diary-lang', REP_LANG_KEY = 'bp-diary-report-lang';
 const $ = id => document.getElementById(id);
+const NATIVE = window.AndroidBridge || null; // Android app shell (android/), absent in the browser
 const pad = n => String(n).padStart(2, '0');
 
 let data = load();
@@ -213,10 +214,17 @@ function t(key, p = {}) {
 }
 
 function load() {
-  try { const v = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(v) ? v : []; }
-  catch { return []; }
+  // in the app the file copy (app storage + Android backup) wins; localStorage is the fallback
+  for (const src of [() => NATIVE && NATIVE.loadData(), () => localStorage.getItem(KEY)]) {
+    try { const v = JSON.parse(src() || 'null'); if (Array.isArray(v)) return v; } catch {}
+  }
+  return [];
 }
-function save() { localStorage.setItem(KEY, JSON.stringify(data)); }
+function save() {
+  const json = JSON.stringify(data);
+  localStorage.setItem(KEY, json);
+  if (NATIVE) NATIVE.saveData(json);
+}
 
 const localStr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const toDate = s => new Date(s);
@@ -262,6 +270,7 @@ function applyStatic() {
   document.documentElement.lang = lang;
   document.title = t('docTitle');
   document.querySelectorAll('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
+  if (NATIVE) $('hint1').textContent = t('hint1App');
   document.querySelectorAll('[data-i18n-ph]').forEach(e => { e.placeholder = t(e.dataset.i18nPh); });
   $('periods').setAttribute('aria-label', t('period'));
   $('formTitle').textContent = t(editId ? 'editEntry' : 'newEntry');
@@ -544,12 +553,18 @@ $('repLang').onchange = e => { repLang = e.target.value; localStorage.setItem(RE
 // print in the report language, then switch back
 addEventListener('beforeprint', () => setLang(repLang));
 addEventListener('afterprint', () => setLang(uiLang));
-$('printBtn').onclick = () => { setLang(repLang); setTimeout(() => print(), 50); };
+$('printBtn').onclick = () => {
+  setLang(repLang);
+  setTimeout(() => (NATIVE ? NATIVE.print(t('docTitle')) : print()), 100);
+};
+window.onNativePrintDone = () => setLang(uiLang);
+window.onNativeSaved = ok => showMsg(t(ok ? 'fileSaved' : 'fileErr'), !ok);
 $('patient').value = localStorage.getItem(NAME_KEY) || '';
 $('patient').oninput = e => { localStorage.setItem(NAME_KEY, e.target.value); render(); };
 
 // ---------- import / export ----------
 function download(name, text, type) {
+  if (NATIVE) return NATIVE.saveFile(name, type, text);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type }));
   a.download = name; a.click();
@@ -594,8 +609,8 @@ addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 150
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
 resetForm();
 render();
-if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
-if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+if (!NATIVE && 'serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');
+if (!NATIVE && navigator.storage && navigator.storage.persist) navigator.storage.persist();
 </script>
 </body>
 </html>

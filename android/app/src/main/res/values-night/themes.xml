@@ -1,0 +1,7 @@
+<resources>
+    <color name="page">#0d0d0d</color>
+    <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/page</item>
+        <item name="android:colorAccent">@color/brand</item>
+    </style>
+</resources>

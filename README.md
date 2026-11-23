@@ -26,3 +26,17 @@
 Делайте резервную копию (JSON) — из неё можно восстановить данные; CSV открывается в Excel.
 
 Категории давления — ориентир, а не диагноз.
+
+## Android-приложение (APK)
+
+Папка `android/` — нативная оболочка (Kotlin + WebView) вокруг того же `index.html`.
+Отличия от браузерной версии: данные в памяти приложения (не стираются при очистке браузера,
+попадают в автокопию Android), сохранение CSV/JSON через системный диалог, печать/PDF через Android.
+Без разрешения на интернет — данные не покидают телефон.
+
+APK собирает GitHub Actions (`.github/workflows/android.yml`) при каждом пуше в `main`
+и публикует в Releases: https://github.com/vapes/bp-diary/releases/latest/download/bp-diary.apk
+
+Подпись: `android/keystore/release.p12`, защищён паролем из секрета репозитория `SIGNING_PASSWORD`
+(Settings → Secrets and variables → Actions). Без секрета APK подписывается временным ключом и в Releases не публикуется.
+Ключ нельзя менять: иначе новую версию нельзя будет установить поверх старой.
